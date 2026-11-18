@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-papyrus: #FAF3DF;
+  --color-papyrus-deep: #F3E7C8;
+  --color-vellum: #FFFDF6;
+  --color-ink: #231B10;
+  --color-ink-muted: #665640;
+  --color-rule: #DFCFA9;
+  --color-cobalt: #1D4E89;
+  --color-cobalt-soft: #E9EFF7;
+  --color-ochre: #9A5B13;
+  --color-verdigris: #1C6B4E;
+  --color-verdigris-soft: #E7F3EE;
+  --color-vermilion: #B3261E;
+  --color-vermilion-soft: #FCECEB;
+}
+
+@layer base {
+  html {
+    background-color: #FAF3DF;
+    color: #231B10;
+    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: #FAF3DF;
+    color: #231B10;
+    min-height: 100dvh;
+    margin: 0;
+  }
+
+  h1, h2, h3 {
+    font-family: "Fraunces", Georgia, serif;
+    text-wrap: balance;
+  }
+
+  /* Tabular numerals for formulas, tables, progress, and counters */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom range slider styling for warm papyrus theme */
+input[type="range"].papyrus-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: #DFCFA9;
+  border-radius: 999px;
+  outline: none;
+}
+
+input[type="range"].papyrus-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #1D4E89;
+  border: 2px solid #FFFDF6;
+  box-shadow: 0 1px 4px rgba(35, 27, 16, 0.25);
+  cursor: pointer;
+}
+
+input[type="range"].papyrus-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #1D4E89;
+  border: 2px solid #FFFDF6;
+  box-shadow: 0 1px 4px rgba(35, 27, 16, 0.25);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
