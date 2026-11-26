@@ -8,7 +8,7 @@ Designed specifically for phone reading and thumb navigation:
 - **Custom Math Keypad**: Built-in on-screen engineering keypad (`f_max`, `log₂(`, `π`, `√(`, `dB`, `bits`, fractions) that never pops up the native mobile OS keyboard.
 - **11 Interactive Signal & Coding Visualizers**: Fourier synthesis, Nyquist aliasing, LTI filtering, convolution overlap, Gaussian noise, Shannon entropy, Shannon-Hartley capacity, ASK/FSK/BPSK waveforms, I-Q constellations, Hamming distance, and a tappable Hamming (7, 4) parity-circle syndrome explorer.
 - **Random Knowledge Drill**: Practice mode includes both chapter-by-chapter sets and a randomized cross-topic drill with topic filtering.
-- **Offline-Ready PWA**: Configured with `vite-plugin-pwa`, Workbox offline caching, and relative `./` paths for seamless GitHub Pages hosting and Android APK wrapping.
+- **Offline-Ready PWA & Direct Android APK**: Automatically builds and publishes both a Progressive Web App and a downloadable, self-contained offline Android `.apk` directly on GitHub Pages.
 
 ---
 
@@ -39,52 +39,35 @@ npm run build
 
 ---
 
-## Hosting on GitHub Pages
+## Automatic GitHub Pages Deployment + Android APK Download
 
-This repository includes an automated GitHub Actions workflow at `.github/workflows/deploy-pages.yml` and uses `base: './'` in `vite.config.ts`, so subpath URLs like `https://<username>.github.io/<repo-name>/` work with zero path edits.
+The included workflow at `.github/workflows/deploy-pages.yml` builds the web app **and** packages a completely self-contained offline Android `.apk` using Capacitor on every push to `main` or `master`.
 
-1. Push this project to a GitHub repository on the `main` branch.
-2. Open your repository **Settings → Pages**.
-3. Under **Build and deployment → Source**, select **GitHub Actions**.
-4. Every push to `main` automatically runs `npm run lint`, `npm run build`, and publishes `dist/` to `https://<username>.github.io/<repo-name>/`.
+### One-Time Setup
+1. Push this repository to GitHub (`main` or `master` branch).
+2. Open **Settings → Pages** in your GitHub repository.
+3. Under **Build and deployment → Source**, choose **GitHub Actions**.
+4. Wait ~2–3 minutes for the **Deploy SigNum & Android APK to GitHub Pages** workflow to complete.
+
+### Installing the APK on Your Android Phone
+1. Open your GitHub Pages site on your Android phone (`https://<username>.github.io/<repo-name>/`).
+2. Tap the **Download Android APK** button directly on the home screen (or visit `https://<username>.github.io/<repo-name>/downloads/signum.apk`).
+3. Tap the downloaded `SigNum.apk` file in Chrome/Files. If prompted, allow **Install unknown apps** for your browser.
+4. Launch **SigNum** from your Android home screen — all lessons, simulations, and the custom math keypad work 100% offline.
+
+> **Note:** The APK is also attached to every workflow run under **Actions → Artifacts (`SigNum-Android-APK`)**.
+
+### Optional: Persistent Release Signing Keystore
+Out of the box, GitHub Actions signs the APK with an Android debug key so it installs immediately with zero configuration. If you want seamless in-place APK upgrades without uninstalling previous versions, add these optional secrets under **Settings → Secrets and variables → Actions**:
+- `ANDROID_KEYSTORE_BASE64` — base64-encoded `.jks` / `.keystore` file (`base64 -w 0 my-release.keystore`)
+- `ANDROID_KEYSTORE_PASSWORD` — keystore password
+- `ANDROID_KEY_ALIAS` — key alias inside the keystore
+- `ANDROID_KEY_PASSWORD` — key password (defaults to keystore password if omitted)
+
+When those secrets are present, the workflow automatically switches to `assembleRelease` + `zipalign` + `apksigner`.
 
 ---
 
-## Installing on Android (PWA or APK)
+## Alternative: Instant Chrome Web App Install (No Sideloading)
 
-Once hosted on GitHub Pages, you can install SigNum on your Android phone in three ways:
-
-### Option 1: Instant Android WebAPK (Simplest — No Build Tools)
-1. Open your GitHub Pages URL in **Chrome for Android**.
-2. Tap **Install Offline App** on the Overview screen (or Chrome menu → **Install app** / **Add to Home screen**).
-3. Android generates an installable WebAPK with the SigNum icon, standalone full-screen window, and full offline Workbox caching.
-
-### Option 2: Signed Android APK via PWABuilder or Bubblewrap (Recommended for `.apk` file)
-Because SigNum ships a complete Web App Manifest (`manifest.webmanifest`) and Service Worker (`sw.js`) with `192x192`, `512x512`, and padded `maskable` PNG icons:
-
-**Fastest (Browser UI via PWABuilder):**
-1. Go to [pwabuilder.com](https://www.pwabuilder.com/) and paste your live GitHub Pages URL (`https://<username>.github.io/<repo-name>/`).
-2. Click **Package for stores → Android → Generate Package** (or download the signed `.apk` bundle directly for sideloading).
-
-**CLI (Google Bubblewrap Trusted Web Activity):**
-```bash
-npm install -g @bubblewrap/cli
-bubblewrap init --manifest="https://<username>.github.io/<repo-name>/manifest.webmanifest"
-bubblewrap build
-```
-This outputs `app-release-signed.apk` ready to install on your Android phone via USB (`adb install app-release-signed.apk`) or file transfer.
-
-> **Hiding the Chrome address bar in a TWA APK:**
-> Copy the SHA-256 fingerprint from your Bubblewrap signing keystore (`bubblewrap fingerprint`) and place a `public/.well-known/assetlinks.json` file in this repo before redeploying to GitHub Pages so Android verifies domain ownership.
-
-### Option 3: Completely Self-Contained Offline APK via Capacitor
-If you want an `.apk` that bundles all HTML/JS/CSS locally without relying on GitHub Pages at all:
-
-```bash
-npm install @capacitor/core @capacitor/cli @capacitor/android
-npx cap init "SigNum" "com.signum.reader" --web-dir=dist
-npm run build
-npx cap add android
-npx cap sync android
-npx cap open android   # Build signed APK from Android Studio or ./gradlew assembleRelease
-```
+If you prefer not to enable sideloading, you can also open your GitHub Pages URL in Chrome for Android and tap **Install Web App** (or Chrome menu → **Install app**).

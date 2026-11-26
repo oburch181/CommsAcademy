@@ -1,4 +1,4 @@
-name: Deploy SigNum to GitHub Pages
+name: Deploy SigNum & Android APK to GitHub Pages
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install web dependencies
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -37,10 +37,86 @@ jobs:
             npm install
           fi
 
-      - name: Type-check & build production PWA bundle
+      - name: Type-check & build production web PWA bundle
         run: |
           npm run lint
           npm run build
+
+      - name: Set up Java 21 for Android APK build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle caching
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate Android project via Capacitor
+        run: |
+          npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8
+          npx cap add android
+          npx --yes @capacitor/assets@4 generate --android --iconBackgroundColor '#FAF3DF' --splashBackgroundColor '#FAF3DF' || true
+          npx cap sync android
+
+      - name: Build installable Android APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p dist/downloads
+          cd android
+          chmod +x gradlew
+
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ]; then
+            echo "Building release APK signed with repository keystore..."
+            ./gradlew assembleRelease --no-daemon
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release.keystore
+            BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
+            "$BUILD_TOOLS_DIR/zipalign" -v -p 4 \
+              app/build/outputs/apk/release/app-release-unsigned.apk \
+              app/build/outputs/apk/release/app-release-aligned.apk
+            "$BUILD_TOOLS_DIR/apksigner" sign \
+              --ks release.keystore \
+              --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+              --ks-key-alias "$ANDROID_KEY_ALIAS" \
+              --key-pass "pass:${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}" \
+              --out ../dist/downloads/signum.apk \
+              app/build/outputs/apk/release/app-release-aligned.apk
+            rm -f release.keystore
+            BUILD_TYPE="release"
+          else
+            echo "Building installable debug-signed APK (zero-config)..."
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../dist/downloads/signum.apk
+            BUILD_TYPE="debug"
+          fi
+
+          cd ..
+          APK_SIZE=$(stat -c%s dist/downloads/signum.apk)
+          APP_VERSION=$(node -p "require('./package.json').version")
+          BUILT_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat <<EOF > dist/downloads/apk-meta.json
+          {
+            "filename": "SigNum.apk",
+            "path": "./downloads/signum.apk",
+            "version": "$APP_VERSION",
+            "sizeBytes": $APK_SIZE,
+            "builtAt": "$BUILT_AT",
+            "buildType": "$BUILD_TYPE"
+          }
+          EOF
+
+      - name: Upload standalone Android APK workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SigNum-Android-APK
+          path: dist/downloads/signum.apk
+          retention-days: 30
 
       - name: Prepare GitHub Pages output
         run: |

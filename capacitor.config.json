@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.signum.reader",
+  "appName": "SigNum",
+  "webDir": "dist",
+  "backgroundColor": "#FAF3DF",
+  "android": {
+    "backgroundColor": "#FAF3DF",
+    "allowMixedContent": false
+  }
+}
