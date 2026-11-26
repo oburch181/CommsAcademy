@@ -23,38 +23,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: '22'
 
       - name: Install web dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm ci || npm install
 
-      - name: Type-check & build production web PWA bundle
+      - name: Type-check & build web PWA bundle
         run: |
           npm run lint
           npm run build
 
-      - name: Set up Java 21 for Android APK build
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36 & accept licenses
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -maxdepth 3 -name sdkmanager -type f 2>/dev/null | head -n 1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found under $SDK_ROOT"
+            exit 1
+          fi
+          { yes || true; } | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses > /dev/null
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Set up Gradle caching
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Generate Android project via Capacitor
+      - name: Generate Capacitor Android project
         run: |
           npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8
           npx cap add android
@@ -90,28 +91,30 @@ jobs:
             rm -f release.keystore
             BUILD_TYPE="release"
           else
-            echo "Building installable debug-signed APK (zero-config)..."
+            echo "Building installable debug-signed APK..."
             ./gradlew assembleDebug --no-daemon
             cp app/build/outputs/apk/debug/app-debug.apk ../dist/downloads/signum.apk
             BUILD_TYPE="debug"
           fi
 
           cd ..
-          APK_SIZE=$(stat -c%s dist/downloads/signum.apk)
-          APP_VERSION=$(node -p "require('./package.json').version")
-          BUILT_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          cat <<EOF > dist/downloads/apk-meta.json
-          {
-            "filename": "SigNum.apk",
-            "path": "./downloads/signum.apk",
-            "version": "$APP_VERSION",
-            "sizeBytes": $APK_SIZE,
-            "builtAt": "$BUILT_AT",
-            "buildType": "$BUILD_TYPE"
-          }
-          EOF
+          test -s dist/downloads/signum.apk
+          BUILD_TYPE="$BUILD_TYPE" node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const stat = fs.statSync("dist/downloads/signum.apk");
+            const meta = {
+              filename: "SigNum.apk",
+              path: "./downloads/signum.apk",
+              version: pkg.version || "1.0.0",
+              sizeBytes: stat.size,
+              builtAt: new Date().toISOString(),
+              buildType: process.env.BUILD_TYPE || "debug"
+            };
+            fs.writeFileSync("dist/downloads/apk-meta.json", JSON.stringify(meta, null, 2));
+          '
 
-      - name: Upload standalone Android APK workflow artifact
+      - name: Upload standalone Android APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: SigNum-Android-APK
@@ -125,6 +128,8 @@ jobs:
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
